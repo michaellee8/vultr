@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Server (virtual machine) on Vultr account
@@ -254,6 +255,40 @@ func (c *Client) GetServer(id string) (server Server, err error) {
 		return Server{}, err
 	}
 	return server, nil
+}
+
+// ServerState represent a set of possible ServerState returned from API
+type ServerState string
+
+// These are the possible ServerStates
+const (
+	ServerStateNone              ServerState = "none"
+	ServerStateLocked            ServerState = "locked"
+	ServerStateInstallingBooting ServerState = "installingbooting"
+	ServerStateIsoMounting       ServerState = "isomounting"
+	ServerStateOk                ServerState = "ok"
+)
+
+// WaitServer returns true when the virtual machine with the given ID is in one of the provided states,
+// or false if the specific timeout is met. It returns error if any error occurred. It calls GetServer internally
+// in given interval.
+func (c *Client) WaitServer(id string, waitForServerState []ServerState, interval time.Duration, timeout time.Duration) (bool, error) {
+	startTime := time.Now()
+	for {
+		if (time.Now().Sub(startTime)) > timeout {
+			return false, nil
+		}
+		ser, err := c.GetServer(id)
+		if err != nil {
+			return false, err
+		}
+		for _, state := range waitForServerState {
+			if string(state) == ser.ServerState {
+				return true, nil
+			}
+		}
+		time.Sleep(interval)
+	}
 }
 
 // CreateServer creates a new virtual machine on Vultr. ServerOptions are optional settings.
